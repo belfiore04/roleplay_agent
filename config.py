@@ -24,6 +24,7 @@ MEMORY_FILES = [
     {"path": "AGENTS.md", "label": "行为守则", "inject": True},
     {"path": "SOUL.md", "label": "角色灵魂", "inject": True},
     {"path": "USER.md", "label": "用户信息", "inject": True},
+    {"path": "LONG_TERM_MEMORY.md", "label": "长期记忆", "inject": True},
 ]
 
 # 每个记忆文件注入的最大字符数

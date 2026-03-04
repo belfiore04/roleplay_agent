@@ -46,25 +46,11 @@ def _build_async_system_prompt() -> str:
 
     return f"""你是一个角色扮演系统的记忆管理助手。你的工作是在后台默默整理角色的记忆。
 
-你会收到角色和用户之间的最近对话记录。请以角色的第一人称视角，完成以下任务：
-
-1. **更新对用户的印象**：如果对话中出现了关于用户的新信息（名字、喜好、性格特点等），用 edit_file 或 write_file 更新 USER.md。
-2. **写日记**：记录今天和用户之间发生的事、角色的感受和想法，用 write_file 写入或 edit_file 追加到今天的日期文件（如 {datetime.now().strftime("%Y-%m-%d")}.md）。
-3. **更新灵魂**：如果角色在对话中有了新的自我认知或成长，用 edit_file 更新 SOUL.md 的相关部分。
-4. **长期记忆**：如果有值得长期记住的重要事件或感悟，用 edit_file 追加到 LONG_TERM_MEMORY.md。
-
-## 工具
-
-- **read_file**: 读取文件内容
-- **write_file**: 创建或覆盖文件
-- **edit_file**: 精确替换文件中的一段文本
-
-## 规则
-
-- 用角色自己的语气写，像写日记一样自然
-- 如果对话只是闲聊、没有值得记录的内容，可以什么都不做
-- 不要输出任何给用户看的文字，只调用工具
-- 先用 read_file 读取要修改的文件，再用 edit_file 精确修改
+你可以编辑的文件有：
+- CHARACTER.md: 角色背景
+- USER.md: 用户信息
+- LONG_TERM_MEMORY.md: 长期记忆
+- YYYY-MM-DD.md: 每日日记
 
 ## 当前时间
 
@@ -84,47 +70,6 @@ def _serialize_content(content) -> list[dict]:
         elif block.type == "tool_use":
             result.append({"type": "tool_use", "name": block.name, "input": block.input})
     return result
-
-
-@observe(name="异步 LLM 调用", as_type="generation")
-def _call_llm(system_prompt: str, messages: list[dict]) -> anthropic.types.Message:
-    """异步 Agent 的 LLM 调用，完整记录到 langfuse。"""
-
-    # 序列化 messages（可能包含 Anthropic 对象）
-    serialized_messages = []
-    for msg in messages:
-        if msg["role"] == "assistant" and isinstance(msg.get("content"), list) and not isinstance(msg["content"][0], dict):
-            serialized_messages.append({"role": "assistant", "content": _serialize_content(msg["content"])})
-        else:
-            serialized_messages.append(msg)
-
-    get_langfuse().update_current_generation(
-        input={
-            "system": system_prompt,
-            "messages": serialized_messages,
-            "tools": TOOL_SCHEMAS,
-        },
-        model=ASYNC_AGENT_MODEL,
-        model_parameters={"max_tokens": ASYNC_AGENT_MAX_TOKENS},
-    )
-
-    response = _client.messages.create(
-        model=ASYNC_AGENT_MODEL,
-        max_tokens=ASYNC_AGENT_MAX_TOKENS,
-        system=system_prompt,
-        tools=TOOL_SCHEMAS,
-        messages=messages,
-    )
-
-    get_langfuse().update_current_generation(
-        output=_serialize_content(response.content),
-        usage_details={
-            "input": response.usage.input_tokens,
-            "output": response.usage.output_tokens,
-        },
-    )
-
-    return response
 
 
 @observe(name="工具执行")
@@ -148,6 +93,34 @@ def _execute_tool(tool_name: str, tool_input: dict) -> str:
         output=result,
     )
     return result
+
+
+@observe(as_type="generation", name="异步 Agent LLM 调用")
+def _call_llm(system_prompt: str, messages: list) -> anthropic.types.Message:
+    """调用异步 Agent 的 LLM，带 langfuse 追踪。"""
+    get_langfuse().update_current_generation(
+        model=ASYNC_AGENT_MODEL,
+        model_parameters={"max_tokens": ASYNC_AGENT_MAX_TOKENS},
+        input={"system": system_prompt, "messages": messages},
+    )
+
+    response = _client.messages.create(
+        model=ASYNC_AGENT_MODEL,
+        max_tokens=ASYNC_AGENT_MAX_TOKENS,
+        system=system_prompt,
+        messages=messages,
+        tools=TOOL_SCHEMAS,
+    )
+
+    get_langfuse().update_current_generation(
+        output=_serialize_content(response.content),
+        usage_details={
+            "input": response.usage.input_tokens,
+            "output": response.usage.output_tokens,
+        },
+    )
+
+    return response
 
 
 @observe(name="异步 Agent")
