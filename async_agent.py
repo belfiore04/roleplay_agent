@@ -1,8 +1,44 @@
 import threading
+import time
 from datetime import datetime
 
 import anthropic
 from langfuse import observe, get_client as get_langfuse
+from prompt_toolkit.application import get_app_or_none
+
+
+# 异步 Agent 状态（供 bottom toolbar 读取）
+_status_lock = threading.Lock()
+_status_text = ""
+_status_time = 0.0
+_app_ref = None  # 从主线程 toolbar 回调中捕获
+
+
+def get_status() -> str:
+    """获取异步 Agent 当前状态文本。超过 30 秒自动清空。"""
+    global _app_ref
+    # toolbar 回调在主线程，趁机捕获 app 引用
+    app = get_app_or_none()
+    if app:
+        _app_ref = app
+    with _status_lock:
+        if _status_text and (time.time() - _status_time > 30):
+            return ""
+        return _status_text
+
+
+def _set_status(text: str):
+    """更新异步 Agent 状态并触发 toolbar 刷新。"""
+    global _status_text, _status_time
+    with _status_lock:
+        _status_text = text
+        _status_time = time.time()
+    # 用捕获的 app 引用触发重绘（invalidate 是线程安全的）
+    if _app_ref:
+        try:
+            _app_ref.invalidate()
+        except Exception:
+            pass
 
 from config import (
     ASYNC_AGENT_API_KEY,
@@ -33,32 +69,65 @@ def _read_workspace_file(path: str) -> str:
 
 def _build_async_system_prompt() -> str:
     """构建异步 Agent 的 system prompt。"""
+    soul_content = _read_workspace_file("SOUL.md")
+    
+    # 判空逻辑：如果没有内容，或者只有骨架标题没有实质文字，视为 empty
+    clean_content = soul_content
+    for header in ["# Soul", "## 性格", "## 说话风格", "## 当前状态"]:
+        clean_content = clean_content.replace(header, "")
+    soul_is_empty = not clean_content.strip()
 
-    # 注入记忆文件，让异步 Agent 了解当前角色状态
+    # Soul 初始化指令（仅 soul 为空时注入）
+    soul_init_block = ""
+    if soul_is_empty:
+        soul_init_block = """
+### Soul 初始化（最高优先级）
+SOUL.md 目前为空。你必须读取 CHARACTER.md，从中提取角色灵魂，写入 SOUL.md，格式：
+# Soul
+## 性格
+（核心性格特质）
+## 说话风格
+（语气、用词、口头禅）
+## 当前状态
+（初始情绪和态度）
+"""
+
+    task_block = f"""## 你的任务
+{soul_init_block}
+### SOUL.md — 角色的活灵魂
+角色会随着经历而改变。如果这轮对话让角色产生了情绪变化、态度转变、或新的认知，微调"当前状态"。变化必须是渐进的、自然的。
+
+### USER.md — 不能忘记的事实
+存放关于用户的**持久事实**：名字、身份、喜好、习惯、承诺、重要经历等。
+这些是即使对话记忆被压缩也**绝不能丢失**的信息。
+不要记录互动流水账，只记事实。
+
+### MEMORY.md — 对话的压缩记忆
+对最近的对话进行概括，保留关键情节和上下文。
+当 MEMORY.md 变长时，将旧内容进一步压缩概括，保持文件精简。
+如果压缩过程中发现有不应丢失的细节（用户事实、重要承诺等），将其提取到 USER.md 后再压缩。"""
+
+    # 注入记忆文件
     context_sections = []
     for mf in MEMORY_FILES:
         if not mf["inject"]:
             continue
+        tag = mf["path"].replace(".md", "").lower()
         content = _read_workspace_file(mf["path"]) or "（暂无内容）"
-        context_sections.append(f"## {mf['path']}\n\n{content}")
+        context_sections.append(f"<{tag}>\n{content}\n</{tag}>")
 
-    project_context = "\n\n".join(context_sections)
+    context_block = "\n\n".join(context_sections)
 
-    return f"""你是一个角色扮演系统的记忆管理助手。你的工作是在后台默默整理角色的记忆。
+    return f"""你是一个角色扮演系统的记忆管理助手。你的工作是在后台默默整理记忆文件。
 
-你可以编辑的文件有：
-- CHARACTER.md: 角色背景
-- USER.md: 用户信息
-- LONG_TERM_MEMORY.md: 长期记忆
-- YYYY-MM-DD.md: 每日日记
+{task_block}
 
-## 当前时间
+<environment>
+当前时间: {datetime.now().strftime("%Y-%m-%d %H:%M")}
+时区: Asia/Shanghai
+</environment>
 
-{datetime.now().strftime("%Y-%m-%d %H:%M")}
-
-## 角色当前状态
-
-{project_context}"""
+{context_block}"""
 
 
 def _serialize_content(content) -> list[dict]:
@@ -148,7 +217,11 @@ def run_async_agent(conversation_messages: list[dict]) -> None:
         {"role": "user", "content": f"以下是角色和用户的最近对话，请整理记忆：\n\n{conversation_text}"}
     ]
 
+    done_tools = []  # 累积已完成的工具调用
+
     while True:
+        prefix = " → ".join(done_tools)
+        _set_status(f"{prefix} → 思考中..." if prefix else "思考中...")
         response = _call_llm(system_prompt, messages)
 
         assistant_content = response.content
@@ -163,10 +236,11 @@ def run_async_agent(conversation_messages: list[dict]) -> None:
         # 执行所有工具调用
         tool_results = []
         for tool_use in tool_uses:
-            result = _execute_tool(tool_use.name, tool_use.input)
             args_str = ", ".join(f"{k}={repr(v)[:40]}" for k, v in tool_use.input.items())
-            status = "✓" if not result.startswith("错误") else "✗"
-            print(f"  [异步] {status} {tool_use.name}({args_str})")
+            result = _execute_tool(tool_use.name, tool_use.input)
+            mark = "✓" if not result.startswith("错误") else "✗"
+            done_tools.append(f"{mark} {tool_use.name}({args_str})")
+            _set_status(" → ".join(done_tools))
             tool_results.append(
                 {
                     "type": "tool_result",
@@ -195,7 +269,9 @@ def start_async_agent(conversation_messages: list[dict]) -> threading.Thread:
 
 def _run_safe(conversation_messages: list[dict]) -> None:
     """安全包装，捕获异常避免线程崩溃。"""
+    _set_status("记忆整理中...")
     try:
         run_async_agent(conversation_messages)
+        _set_status("✓ 记忆整理完成")
     except Exception as e:
-        print(f"  [异步] 记忆整理失败: {e}")
+        _set_status(f"✗ 记忆整理失败: {e}")

@@ -1,11 +1,12 @@
-from datetime import datetime, timedelta
 from pathlib import Path
 
 from langfuse import get_client as get_langfuse
+from prompt_toolkit import PromptSession
+from prompt_toolkit.formatted_text import HTML
 
-from config import MAX_HISTORY_TURNS, MAX_LOG_DAYS, MEMORY_FILES, WORKSPACE_DIR
+from config import MAX_HISTORY_TURNS, MEMORY_FILES, WORKSPACE_DIR
 from agent import chat
-from async_agent import start_async_agent
+from async_agent import get_status, start_async_agent
 
 
 # 默认模板（只包含首次创建时需要的文件）
@@ -14,12 +15,6 @@ TEMPLATES = {
 
 你回到了紫禁城，活过了所有人，赢得了权力，坐上了太后之位。
 你看似拥有一切，却在后半生彻底失去了"活着的重量"。
-""",
-    "SOUL.md": """# SOUL.md
-
-## 关于你
-
-（如果是空，则打开character.md先了解自己，并补充到这里）
 """,
     "USER.md": """# USER.md - About Your Human
 
@@ -38,12 +33,15 @@ _(What do they care about? What projects are they working on? What annoys them? 
 
 The more you know, the better you can help. But remember — you're learning about a person, not building a dossier. Respect the difference.
 """,
-    "LONG_TERM_MEMORY.md": """# 长期记忆
+    "SOUL.md": """# Soul
 
-> 这里存放你的长期记忆，经历过的事、学到的东西、重要感悟。
+## 性格
 
-（暂无内容）
+## 说话风格
+
+## 当前状态
 """,
+    "MEMORY.md": "",
 }
 
 
@@ -51,28 +49,11 @@ def init_workspace():
     """初始化 workspace，如果记忆文件不存在则从模板创建。"""
     WORKSPACE_DIR.mkdir(parents=True, exist_ok=True)
 
-    # AGENTS.md 单独处理：从 workspace 目录自带，不在模板里
     for filename, template in TEMPLATES.items():
         file_path = WORKSPACE_DIR / filename
         if not file_path.exists():
             file_path.write_text(template, encoding="utf-8")
             print(f"  已创建: {filename}")
-
-
-def cleanup_old_logs():
-    """清理超过 MAX_LOG_DAYS 天的聊天日志文件。"""
-    cutoff = datetime.now() - timedelta(days=MAX_LOG_DAYS)
-    removed = 0
-    for f in WORKSPACE_DIR.glob("????-??-??.md"):
-        try:
-            file_date = datetime.strptime(f.stem, "%Y-%m-%d")
-            if file_date < cutoff:
-                f.unlink()
-                removed += 1
-        except ValueError:
-            continue
-    if removed:
-        print(f"  已清理 {removed} 个过期日志文件")
 
 
 def show_status():
@@ -86,21 +67,6 @@ def show_status():
             print(f"  {mf['label']} ({mf['path']}): {lines} 行, {size} 字节")
         else:
             print(f"  {mf['label']} ({mf['path']}): 不存在")
-
-    # 按需读取的文件
-    for name in ["CHARACTER.md", "LONG_TERM_MEMORY.md"]:
-        file_path = WORKSPACE_DIR / name
-        if file_path.exists():
-            size = file_path.stat().st_size
-            lines = len(file_path.read_text(encoding="utf-8").splitlines())
-            print(f"  {name} (按需读取): {lines} 行, {size} 字节")
-
-    # 显示聊天日志
-    logs = sorted(WORKSPACE_DIR.glob("????-??-??.md"))
-    if logs:
-        print(f"  聊天日志: {len(logs)} 个文件")
-        for log in logs[-5:]:
-            print(f"    - {log.name}")
     print("---\n")
 
 
@@ -112,10 +78,15 @@ def reset_workspace():
         return
     for filename, template in TEMPLATES.items():
         (WORKSPACE_DIR / filename).write_text(template, encoding="utf-8")
-    # 清空聊天日志
-    for f in WORKSPACE_DIR.glob("????-??-??.md"):
-        f.unlink()
     print("已重置所有记忆")
+
+
+def _bottom_toolbar():
+    """prompt_toolkit bottom toolbar 回调，显示异步 Agent 状态。"""
+    status = get_status()
+    if status:
+        return HTML(f"<b>[异步]</b> {status}")
+    return HTML("<b>[异步]</b> 空闲")
 
 
 def main():
@@ -127,7 +98,6 @@ def main():
     # 初始化
     print("正在初始化 workspace...")
     init_workspace()
-    cleanup_old_logs()
     print(f"workspace: {WORKSPACE_DIR.resolve()}")
     print()
 
@@ -143,11 +113,12 @@ def main():
     print("-" * 50)
     print()
 
+    session = PromptSession(bottom_toolbar=_bottom_toolbar)
     messages = []
 
     while True:
         try:
-            user_input = input("> ").strip()
+            user_input = session.prompt("> ").strip()
         except (EOFError, KeyboardInterrupt):
             print("\n再见！")
             break

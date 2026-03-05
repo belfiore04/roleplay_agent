@@ -20,8 +20,13 @@ def read_file(path: str) -> str:
     return file_path.read_text(encoding="utf-8")
 
 
+PROTECTED_FILES = {"CHARACTER.md"}
+
+
 def write_file(path: str, content: str) -> str:
     """创建或覆盖 workspace 内的文件。"""
+    if Path(path).name in PROTECTED_FILES:
+        return f"错误: {path} 是只读文件，不允许修改"
     file_path = _safe_resolve(path)
     file_path.parent.mkdir(parents=True, exist_ok=True)
     file_path.write_text(content, encoding="utf-8")
@@ -30,6 +35,8 @@ def write_file(path: str, content: str) -> str:
 
 def edit_file(path: str, old_text: str, new_text: str) -> str:
     """精确替换文件中的文本片段。"""
+    if Path(path).name in PROTECTED_FILES:
+        return f"错误: {path} 是只读文件，不允许修改"
     file_path = _safe_resolve(path)
     if not file_path.exists():
         return f"错误: 文件不存在 - {path}"
@@ -61,7 +68,7 @@ TOOL_SCHEMAS = [
             "properties": {
                 "path": {
                     "type": "string",
-                    "description": "文件的相对路径，如 'SOUL.md'、'USER.md'、'CHARACTER.md'、'LONG_TERM_MEMORY.md' 或 '2026-03-02.md'",
+                    "description": "文件的相对路径，如 'USER.md'、'CHARACTER.md'、'SOUL.md'、'MEMORY.md' 或 '2026-03-02.md'",
                 }
             },
             "required": ["path"],
