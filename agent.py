@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from langfuse.openai import OpenAI
+from openai import OpenAI
 from langfuse import observe, get_client as get_langfuse
 
 from config import (
@@ -50,6 +50,36 @@ def build_system_prompt() -> str:
 {context_block}"""
 
 
+@observe(as_type="generation", name="主 Agent LLM 调用")
+def _call_llm(system_prompt: str, messages: list) -> dict:
+    """调用主 Agent 的 LLM，带 langfuse 追踪。"""
+    get_langfuse().update_current_generation(
+        model=CHAT_MODEL,
+        model_parameters={"max_tokens": CHAT_MAX_TOKENS},
+        input={"system": system_prompt, "messages": messages},
+    )
+
+    api_messages = [{"role": "system", "content": system_prompt}] + messages
+
+    response = client.chat.completions.create(
+        model=CHAT_MODEL,
+        max_tokens=CHAT_MAX_TOKENS,
+        messages=api_messages,
+    )
+
+    reply = response.choices[0].message.content or ""
+
+    get_langfuse().update_current_generation(
+        output=reply,
+        usage_details={
+            "input": response.usage.prompt_tokens,
+            "output": response.usage.completion_tokens,
+        },
+    )
+
+    return reply
+
+
 @observe(name="角色对话")
 def chat(messages: list[dict]) -> str:
     """
@@ -64,16 +94,7 @@ def chat(messages: list[dict]) -> str:
         input=user_input,
     )
 
-    # 构建 OpenAI 格式的消息列表
-    api_messages = [{"role": "system", "content": system_prompt}] + messages
-
-    response = client.chat.completions.create(
-        model=CHAT_MODEL,
-        max_tokens=CHAT_MAX_TOKENS,
-        messages=api_messages,
-    )
-
-    reply = response.choices[0].message.content or ""
+    reply = _call_llm(system_prompt, messages)
 
     messages.append({"role": "assistant", "content": reply})
 

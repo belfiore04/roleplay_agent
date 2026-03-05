@@ -198,7 +198,7 @@ def _call_llm(system_prompt: str, messages: list) -> anthropic.types.Message:
     get_langfuse().update_current_generation(
         model=ASYNC_AGENT_MODEL,
         model_parameters={"max_tokens": ASYNC_AGENT_MAX_TOKENS},
-        input={"system": system_prompt, "messages": messages},
+        input={"system": system_prompt, "messages": messages, "tools": TOOL_SCHEMAS},
     )
 
     response = _client.messages.create(
