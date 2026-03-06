@@ -8,8 +8,8 @@ from config import (
     CHAT_BASE_URL,
     CHAT_MAX_TOKENS,
     CHAT_MODEL,
+    MAIN_INJECT_FILES,
     MAX_INJECT_CHARS,
-    MEMORY_FILES,
     WORKSPACE_DIR,
 )
 
@@ -33,9 +33,7 @@ def build_system_prompt() -> str:
 
     # 用 XML tag 分隔注入各记忆文件
     context_sections = []
-    for mf in MEMORY_FILES:
-        if not mf["inject"]:
-            continue
+    for mf in MAIN_INJECT_FILES:
         tag = mf["path"].replace(".md", "").lower()
         content = _read_workspace_file(mf["path"]) or "（暂无内容）"
         context_sections.append(f"<{tag}>\n{content}\n</{tag}>")

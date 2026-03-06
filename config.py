@@ -19,12 +19,27 @@ ASYNC_AGENT_MAX_TOKENS = int(os.getenv("ASYNC_AGENT_MAX_TOKENS", "4096"))
 # Workspace
 WORKSPACE_DIR = Path(os.getenv("WORKSPACE_DIR", Path(__file__).parent / "workspace"))
 
-# 每轮注入 system prompt 的文件（只注入核心文件，其余按需读取）
-MEMORY_FILES = [
-    {"path": "CHARACTER.md", "label": "角色设定", "inject": True},
-    {"path": "SOUL.md", "label": "角色灵魂", "inject": True},
-    {"path": "USER.md", "label": "用户信息", "inject": True},
-    {"path": "MEMORY.md", "label": "对话记忆", "inject": True},
+# 主 Agent 注入的文件（纯对话，不需要工具相关信息）
+MAIN_INJECT_FILES = [
+    {"path": "CHARACTER.md", "label": "角色设定"},
+    {"path": "SOUL.md", "label": "角色灵魂"},
+    {"path": "USER.md", "label": "用户信息"},
+    {"path": "MEMORY.md", "label": "对话记忆"},
+]
+
+# 异步 Agent 注入的文件（后台记忆管理，比主 Agent 多看到工具目录）
+ASYNC_INJECT_FILES = [
+    {"path": "CHARACTER.md", "label": "角色设定"},
+    {"path": "SOUL.md", "label": "角色灵魂"},
+    {"path": "USER.md", "label": "用户信息"},
+    {"path": "MEMORY.md", "label": "对话记忆"},
+    {"path": "TOOLS.md", "label": "工具目录"},
+]
+
+# 所有 workspace 文件（供 /status 显示）
+ALL_FILES = MAIN_INJECT_FILES + [
+    {"path": "TOOLS.md", "label": "工具目录"},
+    {"path": "NOTES.md", "label": "角色笔记"},
 ]
 
 # 每个记忆文件注入的最大字符数
