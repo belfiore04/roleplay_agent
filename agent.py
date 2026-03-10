@@ -3,6 +3,7 @@ from datetime import datetime
 from openai import OpenAI
 from langfuse import observe, get_client as get_langfuse
 
+import config
 from config import (
     CHAT_API_KEY,
     CHAT_BASE_URL,
@@ -10,7 +11,6 @@ from config import (
     CHAT_MODEL,
     MAIN_INJECT_FILES,
     MAX_INJECT_CHARS,
-    WORKSPACE_DIR,
 )
 
 
@@ -22,7 +22,7 @@ client = OpenAI(
 
 def _read_workspace_file(path: str) -> str:
     """读取 workspace 内的文件，不存在则返回空字符串。"""
-    file_path = WORKSPACE_DIR / path
+    file_path = config.WORKSPACE_DIR / path
     if file_path.exists():
         return file_path.read_text(encoding="utf-8")[:MAX_INJECT_CHARS]
     return ""

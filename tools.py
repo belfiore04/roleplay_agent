@@ -1,13 +1,13 @@
 from datetime import datetime
 from pathlib import Path
 
-from config import WORKSPACE_DIR
+import config
 
 
 def _safe_resolve(path: str) -> Path:
     """将相对路径解析为 workspace 内的绝对路径，防止路径逃逸。"""
-    resolved = (WORKSPACE_DIR / path).resolve()
-    workspace_resolved = WORKSPACE_DIR.resolve()
+    resolved = (config.WORKSPACE_DIR / path).resolve()
+    workspace_resolved = config.WORKSPACE_DIR.resolve()
     if not str(resolved).startswith(str(workspace_resolved)):
         raise PermissionError(f"禁止访问 workspace 之外的路径: {path}")
     return resolved
@@ -54,7 +54,7 @@ def edit_file(path: str, old_text: str, new_text: str) -> str:
 
 def append_note(content: str) -> str:
     """追加一条角色笔记，自动加时间戳。"""
-    file_path = WORKSPACE_DIR / "NOTES.md"
+    file_path = config.WORKSPACE_DIR / "NOTES.md"
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
     entry = f"\n---\n{timestamp}\n\n{content}\n"
     with open(file_path, "a", encoding="utf-8") as f:

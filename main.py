@@ -20,32 +20,34 @@ TEMPLATES = {
 你回到了紫禁城，活过了所有人，赢得了权力，坐上了太后之位。
 你看似拥有一切，却在后半生彻底失去了"活着的重量"。
 """,
-    "USER.md": """# USER.md - About Your Human
+    "USER.md": """# USER.md
 
-_Learn about the person you're helping. Update this as you go._
-
-- **Name:**
-- **What to call them:**
-- **Timezone:**
-- **Notes:**
-
-## Context
-
-_(What do they care about? What projects are they working on? What annoys them? What makes them laugh? Build this over time.)_
-
----
-
-The more you know, the better you can help. But remember — you're learning about a person, not building a dossier. Respect the difference.
 """,
-    "SOUL.md": """# Soul
+    "SOUL.md": """  # Soul
 
-## 性格
+  ## 性格
 
-## 说话风格
 
-## 当前状态
+  ## 说话风格
+
+  
+
+  ## 当前状态
+
+  
+
+  ## 成长变化
+
+  
 """,
-    "MEMORY.md": "",
+    "MEMORY.md": '''  # Memory
+
+  ## 钉住的（不可压缩）
+
+
+  ## 近期
+
+''',
     "NOTES.md": "",
 }
 
