@@ -25,7 +25,7 @@ from replay.core import setup_replay_workspace, get_workspace_state, compute_dif
 
 PROJECT_DIR = Path(__file__).parent.parent.parent.resolve()
 REPLAY_DIR = PROJECT_DIR / "replay_workspace"
-COPY_FILES = ["CHARACTER.md", "TOOLS.md"]
+COPY_FILES = ["CHARACTER.md", "TOOLS.md", "AGENTS.md"]
 
 # 模板目录
 TEMPLATES_DIR = Path(__file__).parent / "templates"

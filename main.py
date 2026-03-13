@@ -10,7 +10,7 @@ from prompt_toolkit.formatted_text import HTML
 
 from roleplay.config import ALL_FILES, FILE_TEMPLATES, MAX_HISTORY_TURNS, WORKSPACE_DIR
 from roleplay.agent import chat
-from roleplay.async_agent import get_status, start_async_agent
+from roleplay.async_agent import geçt_status, start_async_agent
 
 
 # CHARACTER.md 的默认模板（只在首次创建 workspace 时使用）

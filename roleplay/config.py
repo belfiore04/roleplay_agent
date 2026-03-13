@@ -34,6 +34,7 @@ ASYNC_INJECT_FILES = [
     {"path": "USER.md", "label": "用户信息"},
     {"path": "MEMORY.md", "label": "对话记忆"},
     {"path": "TOOLS.md", "label": "工具目录"},
+    {"path": "NOTES.md", "label": "角色笔记"},
 ]
 
 # 所有 workspace 文件（供 /status 显示）
@@ -50,8 +51,8 @@ MAX_HISTORY_TURNS = int(os.getenv("MAX_HISTORY_TURNS", "50"))
 
 # 系统文件初始模板
 FILE_TEMPLATES = {
-    "SOUL.md": "# Soul\n\n## 成长变化\n\n",
+    "SOUL.md": "# Soul\n\n## 身份\n\n## 性格\n\n## 说话风格\n\n## 成长变化\n\n",
     "MEMORY.md": "# Memory\n\n## 钉住的（不可压缩）\n\n\n## 近期\n\n",
-    "USER.md": "# User\n\n## 身份\n\n## 性格\n\n## 喜好\n\n## 与角色的关系\n\n",
+    "USER.md": "# User\n\n## 身份\n\n## 性格\n\n## 喜恶\n\n## 与角色的关系\n\n",
     "NOTES.md": "",
 }

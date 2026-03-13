@@ -27,7 +27,7 @@ from replay.core import setup_replay_workspace, get_workspace_state
 
 PROJECT_DIR = Path(__file__).parent.parent.resolve()
 REPLAY_DIR = PROJECT_DIR / "replay_workspace"
-COPY_FILES = ["CHARACTER.md", "TOOLS.md"]
+COPY_FILES = ["CHARACTER.md", "TOOLS.md", "AGENTS.md"]
 
 
 def print_diff(old_state, new_state):

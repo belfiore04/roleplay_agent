@@ -68,13 +68,37 @@ def _read_workspace_file(path: str) -> str:
     return ""
 
 
+def _extract_last_note(content: str) -> str:
+    """从 NOTES.md 内容中提取最后一条笔记的时间和内容。"""
+    if not content or not content.strip():
+        return "（暂无笔记）"
+
+    # 按 --- 分割，过滤空字符串
+    sections = [s.strip() for s in content.split("---") if s.strip()]
+
+    if not sections:
+        return "（暂无笔记）"
+
+    # 取最后一条
+    last_section = sections[-1]
+    lines = last_section.split("\n", 1)
+
+    if len(lines) < 2:
+        return last_section
+
+    time_str = lines[0].strip()
+    note_content = lines[1].strip()
+
+    return f"上一条笔记时间: {time_str}\n\n上一条笔记内容:\n{note_content}"
+
+
 def _build_async_system_prompt() -> str:
     """构建异步 Agent 的 system prompt。"""
     soul_content = _read_workspace_file("SOUL.md")
     
     # 判空逻辑：如果没有内容，或者只有骨架标题没有实质文字，视为 empty
     clean_content = soul_content
-    for header in ["# Soul", "## 成长变化"]:
+    for header in ["# Soul", "## 身份", "## 性格", "## 说话风格", "## 成长变化"]:
         clean_content = clean_content.replace(header, "")
     soul_is_empty = not clean_content.strip()
 
@@ -86,15 +110,25 @@ def _build_async_system_prompt() -> str:
     soul_init_block = ""
     if soul_is_empty:
         soul_init_block = """### Soul 初始化（最高优先级）
-SOUL.md 目前为空。你必须读取 CHARACTER.md，从中提取角色灵魂，按照下方 SOUL.md 的格式要求写入。
+SOUL.md 目前为空。你必须读取 CHARACTER.md，从中提取角色的身份、性格、说话风格，按照下方 SOUL.md 的格式要求写入（成长变化初始为空）。
 
 """
 
-    task_block = agent_template.replace("{{SOUL_INIT_BLOCK}}", soul_init_block)
+    # 注入上一条笔记到模板
+    notes_content = _read_workspace_file("NOTES.md")
+    last_note = _extract_last_note(notes_content)
 
-    # 注入记忆文件
+    current_time = datetime.now().strftime("%Y-%m-%d %H:%M")
+
+    task_block = agent_template.replace("{{SOUL_INIT_BLOCK}}", soul_init_block)
+    task_block = task_block.replace("{{CURRENT_TIME}}", current_time)
+    task_block = task_block.replace("{{LAST_NOTE}}", last_note)
+
+    # 注入记忆文件（NOTES.md 已通过模板占位符注入，跳过）
     context_sections = []
     for mf in ASYNC_INJECT_FILES:
+        if mf["path"].lower() == "notes.md":
+            continue
         tag = mf["path"].replace(".md", "").lower()
         content = _read_workspace_file(mf["path"]) or "（暂无内容）"
         context_sections.append(f"<{tag}>\n{content}\n</{tag}>")
