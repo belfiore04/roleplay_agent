@@ -8,52 +8,30 @@ from langfuse import get_client as get_langfuse
 from prompt_toolkit import PromptSession
 from prompt_toolkit.formatted_text import HTML
 
-from config import ALL_FILES, MAX_HISTORY_TURNS, WORKSPACE_DIR
-from agent import chat
-from async_agent import get_status, start_async_agent
+from roleplay.config import ALL_FILES, FILE_TEMPLATES, MAX_HISTORY_TURNS, WORKSPACE_DIR
+from roleplay.agent import chat
+from roleplay.async_agent import get_status, start_async_agent
 
 
-# 默认模板（只包含首次创建时需要的文件）
-TEMPLATES = {
-    "CHARACTER.md": """甄嬛 · 回宫线
+# CHARACTER.md 的默认模板（只在首次创建 workspace 时使用）
+_CHARACTER_TEMPLATE = """甄嬛 · 回宫线
 
 你回到了紫禁城，活过了所有人，赢得了权力，坐上了太后之位。
 你看似拥有一切，却在后半生彻底失去了"活着的重量"。
-""",
-    "USER.md": """# USER.md
-
-    ## 身份
-
-    ## 性格
-
-    ## 喜好
-
-    ## 与角色的关系
-
-""",
-    "SOUL.md": """  # Soul
-
-  ## 成长变化
-
-  
-""",
-    "MEMORY.md": '''  # Memory
-
-  ## 钉住的（不可压缩）
-
-
-  ## 近期
-
-''',
-    "NOTES.md": "",
-}
+"""
 
 
 def init_workspace():
     """初始化 workspace，如果记忆文件不存在则从模板创建。"""
     WORKSPACE_DIR.mkdir(parents=True, exist_ok=True)
 
-    for filename, template in TEMPLATES.items():
+    # CHARACTER.md 单独处理（不在 FILE_TEMPLATES 中）
+    char_path = WORKSPACE_DIR / "CHARACTER.md"
+    if not char_path.exists():
+        char_path.write_text(_CHARACTER_TEMPLATE, encoding="utf-8")
+        print("  已创建: CHARACTER.md")
+
+    for filename, template in FILE_TEMPLATES.items():
         file_path = WORKSPACE_DIR / filename
         if not file_path.exists():
             file_path.write_text(template, encoding="utf-8")
@@ -80,7 +58,7 @@ def reset_workspace():
     if confirm.lower() != "y":
         print("已取消")
         return
-    for filename, template in TEMPLATES.items():
+    for filename, template in FILE_TEMPLATES.items():
         (WORKSPACE_DIR / filename).write_text(template, encoding="utf-8")
     print("已重置所有记忆")
 
@@ -265,7 +243,7 @@ def main_cli():
     
     # 更新 workspace 路径（通过修改 config 模块）
     if args.workspace != str(WORKSPACE_DIR):
-        import config
+        from roleplay import config
         config.WORKSPACE_DIR = Path(args.workspace).expanduser().resolve()
     
     # 处理命令

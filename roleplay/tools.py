@@ -1,7 +1,7 @@
 from datetime import datetime
 from pathlib import Path
 
-import config
+from roleplay import config
 
 
 def _safe_resolve(path: str) -> Path:
@@ -128,7 +128,7 @@ TOOL_SCHEMAS = [
     },
     {
         "name": "append_note",
-        "description": "以角色的口吻写一条私人笔记。内容是角色的内心独白、对用户的看法、当天的感受等。用户可以查看这些笔记，但笔记不会出现在你的上下文中。当你觉得角色此刻有话想说、有情绪想记录、或对用户产生了新的感受时，写一条。不必每轮都写，没什么想说的时候就不写。",
+        "description": "以角色的口吻写一条私人笔记。内容是角色的内心独白、对用户的看法、当天的感受等。用户可以查看这些笔记，但笔记不会出现在你的上下文中。当你觉得角色此刻有情绪想记录、或对用户产生了新的感受时，写一条。不必写得太频繁，可以根据角色的性格特点、对话的主题、具体事件对角色的重要性来自行判断是否写入NOTES。不必每轮都写，没什么想说的时候就不写。",
         "input_schema": {
             "type": "object",
             "properties": {

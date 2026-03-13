@@ -2,7 +2,7 @@
 回放测试工具：用固定的对话内容测试异步 Agent 的记忆整理效果。
 
 用法：
-    python replay.py conversation.json
+    python -m replay.cli conversation.json
 
 输入格式（conversation.json）：
 [
@@ -16,45 +16,18 @@
 全程不动原始 workspace。
 """
 
+import difflib
 import json
 import sys
-import shutil
-import difflib
 from pathlib import Path
 
-project_dir = Path(__file__).parent.resolve()
-sys.path.insert(0, str(project_dir))
+from roleplay.config import FILE_TEMPLATES, WORKSPACE_DIR
 
-from config import WORKSPACE_DIR
+from replay.core import setup_replay_workspace, get_workspace_state
 
-REPLAY_DIR = project_dir / "replay_workspace"
-
-# 从原始 workspace 复制的只读文件
+PROJECT_DIR = Path(__file__).parent.parent.resolve()
+REPLAY_DIR = PROJECT_DIR / "replay_workspace"
 COPY_FILES = ["CHARACTER.md", "TOOLS.md"]
-# 系统文件，从空白开始
-SYSTEM_FILES = ["SOUL.md", "MEMORY.md", "USER.md", "NOTES.md"]
-
-
-def setup_replay_workspace():
-    """创建 replay_workspace，复制只读文件，清空系统文件。"""
-    if REPLAY_DIR.exists():
-        shutil.rmtree(REPLAY_DIR)
-    REPLAY_DIR.mkdir()
-
-    for name in COPY_FILES:
-        src = WORKSPACE_DIR / name
-        if src.exists():
-            shutil.copy2(src, REPLAY_DIR / name)
-
-    for name in SYSTEM_FILES:
-        (REPLAY_DIR / name).write_text("", encoding="utf-8")
-
-
-def get_workspace_state():
-    state = {}
-    for p in REPLAY_DIR.glob("*.md"):
-        state[p.name] = p.read_text("utf-8")
-    return state
 
 
 def print_diff(old_state, new_state):
@@ -80,7 +53,7 @@ def print_diff(old_state, new_state):
 
 def main():
     if len(sys.argv) < 2:
-        print("用法: python replay.py <conversation.json>")
+        print("用法: python -m replay.cli <conversation.json>")
         print()
         print("输入格式:")
         print('[{"user": "你好", "assistant": "你好啊"}, ...]')
@@ -95,15 +68,10 @@ def main():
     print(f"载入 {len(conversation)} 轮对话\n")
 
     # 创建独立的 replay workspace
-    setup_replay_workspace()
+    setup_replay_workspace(REPLAY_DIR, WORKSPACE_DIR, FILE_TEMPLATES, COPY_FILES)
     print(f"已创建测试工作区: {REPLAY_DIR}\n")
 
-    # 将 config 中的 WORKSPACE_DIR 指向 replay 目录
-    import config
-    config.WORKSPACE_DIR = REPLAY_DIR
-
-    # 延迟导入（在修改 config 之后）
-    from async_agent import run_async_agent
+    from roleplay.async_agent import run_async_agent
     from langfuse import get_client as get_langfuse
 
     messages = []
@@ -122,12 +90,12 @@ def main():
         print(f"  角色: {assistant_msg[:80]}{'...' if len(assistant_msg) > 80 else ''}")
         print()
 
-        old_state = get_workspace_state()
+        old_state = get_workspace_state(REPLAY_DIR)
 
-        run_async_agent(messages.copy())
+        run_async_agent(messages.copy(), workspace_dir=REPLAY_DIR)
         get_langfuse().flush()
 
-        new_state = get_workspace_state()
+        new_state = get_workspace_state(REPLAY_DIR)
 
         print("  变更:")
         print_diff(old_state, new_state)
@@ -136,7 +104,7 @@ def main():
     print(f"{'='*60}")
     print("回放结束，最终文件状态：")
     print(f"{'='*60}\n")
-    for name in sorted(get_workspace_state()):
+    for name in sorted(get_workspace_state(REPLAY_DIR)):
         content = (REPLAY_DIR / name).read_text("utf-8")
         if content.strip():
             print(f"--- {name} ---")

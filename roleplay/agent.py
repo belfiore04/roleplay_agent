@@ -3,8 +3,8 @@ from datetime import datetime
 from openai import OpenAI
 from langfuse import observe, get_client as get_langfuse
 
-import config
-from config import (
+from roleplay import config
+from roleplay.config import (
     CHAT_API_KEY,
     CHAT_BASE_URL,
     CHAT_MAX_TOKENS,

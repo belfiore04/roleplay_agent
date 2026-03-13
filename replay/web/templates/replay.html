@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Replay Viewer - {{CONV_FILE}}</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --bg: #1a1a2e;
+  --bg-secondary: #16213e;
+  --bg-card: #0f3460;
+  --text: #e0e0e0;
+  --text-muted: #8892a4;
+  --accent: #00d2ff;
+  --accent-dim: #0a4f6a;
+  --green: #4ade80;
+  --red: #f87171;
+  --green-bg: rgba(74, 222, 128, 0.1);
+  --red-bg: rgba(248, 113, 113, 0.1);
+  --border: #2a3a5c;
+  --timeline-line: #2a3a5c;
+  --node-done: #00d2ff;
+  --node-active: #fbbf24;
+  --node-pending: #4a5568;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans SC", sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  height: 100vh;
+  overflow: hidden;
+}
+
+.layout {
+  display: flex;
+  height: 100vh;
+}
+
+/* ===== 左侧时间线 ===== */
+.sidebar {
+  width: 280px;
+  min-width: 280px;
+  background: var(--bg-secondary);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+}
+
+.sidebar-header {
+  padding: 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.sidebar-header h1 {
+  font-size: 14px;
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.sidebar-header .file-name {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+.controls {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.ctrl-btn {
+  flex: 1;
+  padding: 6px 0;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.start-btn {
+  background: var(--accent-dim);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.start-btn:hover:not(:disabled) {
+  background: rgba(0, 210, 255, 0.25);
+}
+
+.stop-btn {
+  background: rgba(248, 113, 113, 0.1);
+  border-color: var(--red);
+  color: var(--red);
+}
+
+.stop-btn:hover:not(:disabled) {
+  background: rgba(248, 113, 113, 0.25);
+}
+
+.ctrl-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.progress-bar {
+  height: 3px;
+  background: var(--border);
+  margin-top: 8px;
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  background: var(--accent);
+  width: 0%;
+  transition: width 0.3s ease;
+}
+
+.progress-text {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+.timeline {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 0;
+}
+
+.timeline-node {
+  display: flex;
+  align-items: flex-start;
+  padding: 8px 16px;
+  cursor: pointer;
+  transition: background 0.15s;
+  position: relative;
+}
+
+.timeline-node:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.timeline-node.selected {
+  background: rgba(0, 210, 255, 0.08);
+}
+
+.timeline-node .dot-col {
+  width: 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.timeline-node .dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--node-pending);
+  border: 2px solid var(--node-pending);
+  z-index: 1;
+  flex-shrink: 0;
+}
+
+.timeline-node.done .dot {
+  background: var(--node-done);
+  border-color: var(--node-done);
+}
+
+.timeline-node.active .dot {
+  background: var(--node-active);
+  border-color: var(--node-active);
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.timeline-node.selected .dot {
+  box-shadow: 0 0 0 3px rgba(0, 210, 255, 0.3);
+}
+
+.timeline-node.no-change .dot {
+  background: transparent;
+  border-color: var(--node-pending);
+}
+
+/* 连接线 */
+.timeline-node:not(:last-child) .dot-col::after {
+  content: '';
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 1px;
+  height: calc(100% + 2px);
+  background: var(--timeline-line);
+}
+
+.timeline-node .info {
+  flex: 1;
+  min-width: 0;
+  margin-left: 10px;
+}
+
+.timeline-node .turn-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.timeline-node .turn-preview {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.timeline-node .change-badge {
+  font-size: 10px;
+  color: var(--accent);
+  margin-top: 2px;
+}
+
+.timeline-node.no-change .change-badge {
+  color: var(--text-muted);
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+/* ===== 右侧详情 ===== */
+.main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.detail-header {
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-secondary);
+}
+
+.detail-header .turn-title {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.detail-header .conversation {
+  margin-top: 10px;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.detail-header .conversation .role {
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.detail-header .conversation .role-assistant {
+  color: var(--green);
+}
+
+.detail-header .conversation .msg-text {
+  color: var(--text);
+  margin-left: 4px;
+}
+
+/* 文件 tabs */
+.file-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-secondary);
+  padding: 0 24px;
+}
+
+.file-tab {
+  padding: 8px 16px;
+  font-size: 13px;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all 0.15s;
+}
+
+.file-tab:hover {
+  color: var(--text);
+}
+
+.file-tab.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+.file-tab.has-changes {
+  color: var(--text);
+}
+
+.file-tab .change-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  margin-left: 4px;
+  vertical-align: middle;
+}
+
+/* 视图切换 */
+.view-toggle {
+  display: flex;
+  padding: 8px 24px;
+  gap: 8px;
+  background: var(--bg);
+}
+
+.view-btn {
+  padding: 4px 12px;
+  font-size: 12px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.view-btn.active {
+  background: var(--accent-dim);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* 内容区域 */
+.content-area {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 24px;
+  font-family: "SF Mono", "Fira Code", "Cascadia Code", monospace;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.diff-line {
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.diff-line.add {
+  background: var(--green-bg);
+  color: var(--green);
+}
+
+.diff-line.remove {
+  background: var(--red-bg);
+  color: var(--red);
+}
+
+.diff-line.header {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.diff-line.range {
+  color: var(--text-muted);
+}
+
+.full-content {
+  white-space: pre-wrap;
+  word-break: break-all;
+  color: var(--text);
+}
+
+/* 空状态 */
+.empty-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--text-muted);
+  font-size: 14px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+.no-diff {
+  color: var(--text-muted);
+  font-style: italic;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+</style>
+</head>
+<body>
+<div class="layout">
+  <!-- 左侧时间线 -->
+  <div class="sidebar">
+    <div class="sidebar-header">
+      <h1>Replay Viewer</h1>
+      <div class="file-name">{{CONV_FILE}}</div>
+      <div class="controls">
+        <button class="ctrl-btn start-btn" id="startBtn" onclick="onStart()">开始</button>
+        <button class="ctrl-btn stop-btn" id="stopBtn" onclick="onStop()" disabled>停止</button>
+      </div>
+      <div class="progress-bar"><div class="progress-bar-fill" id="progressFill"></div></div>
+      <div class="progress-text" id="progressText">就绪</div>
+    </div>
+    <div class="timeline" id="timeline"></div>
+  </div>
+
+  <!-- 右侧详情 -->
+  <div class="main">
+    <div class="detail-header" id="detailHeader">
+      <div class="turn-title" id="turnTitle">选择一个轮次查看详情</div>
+      <div class="conversation" id="conversation"></div>
+    </div>
+    <div class="file-tabs" id="fileTabs"></div>
+    <div class="view-toggle" id="viewToggle" style="display:none">
+      <button class="view-btn active" data-view="diff" onclick="switchView('diff')">Diff</button>
+      <button class="view-btn" data-view="full" onclick="switchView('full')">完整内容</button>
+    </div>
+    <div class="content-area" id="contentArea">
+      <div class="empty-state">等待 Replay 开始...</div>
+    </div>
+  </div>
+</div>
+
+<script>
+const TOTAL = {{TOTAL_TURNS}};
+const FILE_ORDER = ['SOUL.md', 'MEMORY.md', 'USER.md', 'NOTES.md'];
+
+// 每轮的数据
+const turnData = {};
+let selectedTurn = null;
+let selectedFile = null;
+let currentView = 'diff';
+let ws = null;
+let isRunning = false;
+
+// 创建预置的时间线节点
+function initTimeline() {
+  const timeline = document.getElementById('timeline');
+  for (let i = 0; i < TOTAL; i++) {
+    const node = document.createElement('div');
+    node.className = 'timeline-node';
+    node.id = `node-${i}`;
+    node.innerHTML = `
+      <div class="dot-col"><div class="dot"></div></div>
+      <div class="info">
+        <div class="turn-label">第 ${i + 1} 轮</div>
+        <div class="turn-preview">等待中...</div>
+        <div class="change-badge"></div>
+      </div>
+    `;
+    node.addEventListener('click', () => selectTurn(i));
+    timeline.appendChild(node);
+  }
+}
+
+function updateProgress(done, total) {
+  const pct = Math.round((done / total) * 100);
+  document.getElementById('progressFill').style.width = pct + '%';
+  document.getElementById('progressText').textContent = `${done} / ${total} 轮完成`;
+}
+
+function truncate(text, maxLen) {
+  if (text.length <= maxLen) return text;
+  return text.slice(0, maxLen) + '...';
+}
+
+function onTurnStart(data) {
+  const node = document.getElementById(`node-${data.turn}`);
+  if (!node) return;
+  node.className = 'timeline-node active';
+  node.querySelector('.turn-preview').textContent = truncate(data.user, 30);
+
+  // 滚动到可见
+  node.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function onTurnDone(data) {
+  turnData[data.turn] = data;
+
+  const node = document.getElementById(`node-${data.turn}`);
+  if (!node) return;
+
+  const changedFiles = Object.keys(data.diffs);
+  const hasChanges = changedFiles.length > 0;
+
+  node.className = 'timeline-node done' + (hasChanges ? '' : ' no-change');
+  node.querySelector('.turn-preview').textContent = truncate(data.user, 30);
+
+  if (hasChanges) {
+    node.querySelector('.change-badge').textContent = changedFiles.join(', ');
+  } else {
+    node.querySelector('.change-badge').textContent = '无变更';
+  }
+
+  updateProgress(data.turn + 1, data.total);
+
+  // 自动选中第一个有变更的轮次
+  if (selectedTurn === null && hasChanges) {
+    selectTurn(data.turn);
+  }
+}
+
+function onDone() {
+  document.getElementById('progressText').textContent = `全部完成 (${TOTAL} 轮)`;
+}
+
+function onTurnError(data) {
+  const node = document.getElementById(`node-${data.turn}`);
+  if (!node) return;
+  node.className = 'timeline-node done no-change';
+  node.querySelector('.turn-preview').textContent = '错误';
+  node.querySelector('.change-badge').textContent = data.error;
+}
+
+function selectTurn(i) {
+  const data = turnData[i];
+  if (!data) return;
+
+  // 更新选中状态
+  if (selectedTurn !== null) {
+    const prev = document.getElementById(`node-${selectedTurn}`);
+    if (prev) prev.classList.remove('selected');
+  }
+  selectedTurn = i;
+  const node = document.getElementById(`node-${i}`);
+  if (node) node.classList.add('selected');
+
+  // 更新详情头
+  document.getElementById('turnTitle').textContent = `第 ${i + 1} / ${TOTAL} 轮`;
+  const convEl = document.getElementById('conversation');
+  convEl.innerHTML = `
+    <div><span class="role">用户:</span><span class="msg-text">${escapeHtml(data.user)}</span></div>
+    <div><span class="role role-assistant">角色:</span><span class="msg-text">${escapeHtml(data.assistant)}</span></div>
+  `;
+
+  // 更新文件 tabs
+  renderFileTabs(data);
+
+  // 默认选中第一个有变更的文件，或第一个文件
+  const changedFiles = Object.keys(data.diffs);
+  if (changedFiles.length > 0) {
+    const firstChanged = FILE_ORDER.find(f => changedFiles.includes(f)) || changedFiles[0];
+    selectFile(firstChanged);
+  } else {
+    selectFile(FILE_ORDER[0]);
+  }
+}
+
+function renderFileTabs(data) {
+  const tabsEl = document.getElementById('fileTabs');
+  tabsEl.innerHTML = '';
+  for (const fname of FILE_ORDER) {
+    const tab = document.createElement('div');
+    const hasChange = fname in data.diffs;
+    tab.className = 'file-tab' + (hasChange ? ' has-changes' : '');
+    tab.dataset.file = fname;
+    const label = fname.replace('.md', '');
+    tab.innerHTML = label + (hasChange ? '<span class="change-dot"></span>' : '');
+    tab.addEventListener('click', () => selectFile(fname));
+    tabsEl.appendChild(tab);
+  }
+}
+
+function selectFile(fname) {
+  selectedFile = fname;
+
+  // 更新 tab 高亮
+  document.querySelectorAll('.file-tab').forEach(tab => {
+    tab.classList.toggle('active', tab.dataset.file === fname);
+  });
+
+  // 显示视图切换
+  document.getElementById('viewToggle').style.display = 'flex';
+
+  renderContent();
+}
+
+function switchView(view) {
+  currentView = view;
+  document.querySelectorAll('.view-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.view === view);
+  });
+  renderContent();
+}
+
+function renderContent() {
+  const area = document.getElementById('contentArea');
+  const data = turnData[selectedTurn];
+  if (!data || !selectedFile) {
+    area.innerHTML = '<div class="empty-state">选择一个轮次和文件</div>';
+    return;
+  }
+
+  if (currentView === 'diff') {
+    const diff = data.diffs[selectedFile];
+    if (!diff) {
+      area.innerHTML = '<div class="no-diff">此轮无变更</div>';
+      return;
+    }
+    area.innerHTML = renderDiff(diff);
+  } else {
+    const content = data.files[selectedFile] || '';
+    if (!content.trim()) {
+      area.innerHTML = '<div class="no-diff">文件为空</div>';
+      return;
+    }
+    area.innerHTML = `<div class="full-content">${escapeHtml(content)}</div>`;
+  }
+}
+
+function renderDiff(diffText) {
+  const lines = diffText.split('\n');
+  return lines.map(line => {
+    const escaped = escapeHtml(line);
+    if (line.startsWith('+++') || line.startsWith('---')) {
+      return `<div class="diff-line header">${escaped}</div>`;
+    } else if (line.startsWith('@@')) {
+      return `<div class="diff-line range">${escaped}</div>`;
+    } else if (line.startsWith('+')) {
+      return `<div class="diff-line add">${escaped}</div>`;
+    } else if (line.startsWith('-')) {
+      return `<div class="diff-line remove">${escaped}</div>`;
+    } else {
+      return `<div class="diff-line">${escaped}</div>`;
+    }
+  }).join('');
+}
+
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+// 控制按钮状态
+function setRunning(running) {
+  isRunning = running;
+  document.getElementById('startBtn').disabled = running;
+  document.getElementById('stopBtn').disabled = !running;
+  document.getElementById('startBtn').textContent = running ? '运行中...' : '开始';
+}
+
+// 重置 UI 到初始状态
+function resetUI() {
+  // 清空数据
+  Object.keys(turnData).forEach(k => delete turnData[k]);
+  selectedTurn = null;
+  selectedFile = null;
+
+  // 重置时间线节点
+  for (let i = 0; i < TOTAL; i++) {
+    const node = document.getElementById(`node-${i}`);
+    if (!node) continue;
+    node.className = 'timeline-node';
+    node.querySelector('.turn-preview').textContent = '等待中...';
+    node.querySelector('.change-badge').textContent = '';
+  }
+
+  // 重置右侧
+  document.getElementById('turnTitle').textContent = '选择一个轮次查看详情';
+  document.getElementById('conversation').innerHTML = '';
+  document.getElementById('fileTabs').innerHTML = '';
+  document.getElementById('viewToggle').style.display = 'none';
+  document.getElementById('contentArea').innerHTML = '<div class="empty-state">等待 Replay 开始...</div>';
+
+  // 重置进度
+  document.getElementById('progressFill').style.width = '0%';
+  document.getElementById('progressText').textContent = '就绪';
+}
+
+// WebSocket 连接
+function ensureWs() {
+  return new Promise((resolve) => {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      resolve();
+      return;
+    }
+    const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    ws = new WebSocket(`${protocol}//${location.host}/ws`);
+
+    ws.onopen = () => resolve();
+
+    ws.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      switch (data.type) {
+        case 'turn_start':
+          onTurnStart(data);
+          break;
+        case 'turn_done':
+          onTurnDone(data);
+          break;
+        case 'turn_error':
+          onTurnError(data);
+          break;
+        case 'done':
+          onDone();
+          setRunning(false);
+          break;
+        case 'stopped':
+          document.getElementById('progressText').textContent += ' (已停止)';
+          setRunning(false);
+          break;
+      }
+    };
+
+    ws.onerror = () => {
+      document.getElementById('progressText').textContent = '连接错误';
+      setRunning(false);
+    };
+
+    ws.onclose = () => {
+      ws = null;
+      setRunning(false);
+    };
+  });
+}
+
+async function onStart() {
+  resetUI();
+  setRunning(true);
+  document.getElementById('progressText').textContent = '正在连接...';
+  await ensureWs();
+  document.getElementById('progressText').textContent = '开始 Replay...';
+  ws.send(JSON.stringify({ type: 'start' }));
+}
+
+function onStop() {
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({ type: 'stop' }));
+    document.getElementById('progressText').textContent += ' 正在停止...';
+  }
+}
+
+// 初始化
+initTimeline();
+</script>
+</body>
+</html>
