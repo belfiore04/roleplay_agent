@@ -9,8 +9,8 @@ from prompt_toolkit import PromptSession
 from prompt_toolkit.formatted_text import HTML
 
 from roleplay.config import ALL_FILES, FILE_TEMPLATES, MAX_HISTORY_TURNS, WORKSPACE_DIR
-from roleplay.agent import chat
-from roleplay.async_agent import geçt_status, start_async_agent
+from roleplay.agent import chat, proactive_chat
+from roleplay.async_agent import get_status, start_async_agent
 
 
 # CHARACTER.md 的默认模板（只在首次创建 workspace 时使用）
@@ -131,6 +131,14 @@ def main():
 
     session = PromptSession(bottom_toolbar=_bottom_toolbar)
     messages = []
+
+    # 角色主动说话
+    try:
+        greeting = proactive_chat()
+        print(f"角色: {greeting}\n")
+        messages.append({"role": "assistant", "content": greeting})
+    except Exception as e:
+        print(f"[主动说话失败] {e}\n")
 
     while True:
         try:

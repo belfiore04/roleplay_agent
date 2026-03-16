@@ -78,6 +78,33 @@ def _call_llm(system_prompt: str, messages: list) -> dict:
     return reply
 
 
+def _is_first_meeting() -> bool:
+    """判断是否首次见面：MEMORY.md 内容是否还是初始模板。"""
+    memory_content = _read_workspace_file("MEMORY.md")
+    template = config.FILE_TEMPLATES.get("MEMORY.md", "")
+    return memory_content.strip() == template.strip()
+
+
+@observe(name="角色主动说话")
+def proactive_chat() -> str:
+    """角色主动开口说话，不需要用户消息。根据记忆状态区分首次见面和回访。"""
+    system_prompt = build_system_prompt()
+
+    if _is_first_meeting():
+        system_prompt += "\n\n<task>\n用户刚刚来到你面前，这是你们的第一次见面。你需要主动开口说第一句话。根据你的性格和身份，自然地打招呼或开场。\n</task>"
+    else:
+        system_prompt += '\n\n<task>\n用户回来了。根据你对他的了解和最近的记忆，主动说一句话。可以是打招呼、接上次的话题、或者根据当前时间/情境自然地开口。不要生硬地"总结上次内容"，要像真的记得一样自然地说。\n</task>'
+
+    reply = _call_llm(system_prompt, [])
+
+    get_langfuse().update_current_trace(
+        input="[主动说话]",
+        output=reply,
+    )
+
+    return reply
+
+
 @observe(name="角色对话")
 def chat(messages: list[dict]) -> str:
     """
