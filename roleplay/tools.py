@@ -73,38 +73,6 @@ TOOL_HANDLERS = {
 # Anthropic tool schemas
 TOOL_SCHEMAS = [
     {
-        "name": "read_file",
-        "description": "读取 workspace 内的文件内容。用于查看你的记忆文件或其他文件。",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "path": {
-                    "type": "string",
-                    "description": "文件的相对路径，如 'USER.md'、'CHARACTER.md'、'SOUL.md'、'MEMORY.md' 或 '2026-03-02.md'",
-                }
-            },
-            "required": ["path"],
-        },
-    },
-    {
-        "name": "write_file",
-        "description": "创建或覆盖 workspace 内的文件。用于更新你的记忆、记录新的信息。",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "path": {
-                    "type": "string",
-                    "description": "文件的相对路径",
-                },
-                "content": {
-                    "type": "string",
-                    "description": "要写入的完整文件内容",
-                },
-            },
-            "required": ["path", "content"],
-        },
-    },
-    {
         "name": "edit_file",
         "description": "精确替换文件中的一段文本。适合小范围修改，无需重写整个文件。",
         "input_schema": {

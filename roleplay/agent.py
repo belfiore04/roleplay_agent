@@ -41,7 +41,7 @@ def build_system_prompt() -> str:
     context_block = "\n\n".join(context_sections)
 
     return f"""<environment>
-当前时间: {datetime.now().strftime("%Y-%m-%d %H:%M")}
+当前时间: {datetime.now().strftime("%Y-%m-%d %H:%M %A")}
 时区: Asia/Shanghai
 </environment>
 
