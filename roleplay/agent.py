@@ -44,6 +44,9 @@ def build_system_prompt() -> str:
 
     context_block = "\n\n".join(context_sections)
 
+    # 读取主 Agent prompt 模板
+    agent_md = _read_workspace_file("AGENTS.md")
+
     return f"""<environment>
 当前时间: {datetime.now().strftime("%Y-%m-%d %H:%M %A")}
 时区: Asia/Shanghai
@@ -51,9 +54,7 @@ def build_system_prompt() -> str:
 
 {context_block}
 
-<instructions>
-主动推进对话：根据你的性格和记忆，自然地回应对方、发起新话题或转移话题方向，让对话保持活跃。
-</instructions>"""
+{agent_md}"""
 
 
 @observe(as_type="generation", name="主 Agent LLM 调用")

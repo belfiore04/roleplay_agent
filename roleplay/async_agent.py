@@ -129,7 +129,7 @@ def _build_async_system_prompt() -> str:
     soul_is_empty = config.is_soul_empty()
 
     # 读取 prompt 模板
-    agent_md_path = config.WORKSPACE_DIR / "AGENTS.md"
+    agent_md_path = config.WORKSPACE_DIR / "ASYNC_AGENTS.md"
     agent_template = agent_md_path.read_text(encoding="utf-8")
 
     # Soul 初始化指令（仅 soul 为空时注入）
