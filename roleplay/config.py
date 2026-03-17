@@ -14,7 +14,10 @@ CHAT_MAX_TOKENS = int(os.getenv("CHAT_MAX_TOKENS", "4096"))
 ASYNC_AGENT_API_KEY = os.getenv("ASYNC_AGENT_API_KEY", "")
 ASYNC_AGENT_BASE_URL = os.getenv("ASYNC_AGENT_BASE_URL", "")
 ASYNC_AGENT_MODEL = os.getenv("ASYNC_AGENT_MODEL", "MiniMax-M2.5")
-ASYNC_AGENT_MAX_TOKENS = int(os.getenv("ASYNC_AGENT_MAX_TOKENS", "4096"))
+ASYNC_AGENT_MAX_TOKENS = int(os.getenv("ASYNC_AGENT_MAX_TOKENS", "16384"))
+
+# 异步 Agent SDK 类型（openai 或 anthropic，用于切换回旧版本）
+ASYNC_AGENT_SDK = os.getenv("ASYNC_AGENT_SDK", "openai")
 
 # Workspace
 WORKSPACE_DIR = Path(os.getenv("WORKSPACE_DIR", Path(__file__).parent.parent / "workspace"))
@@ -43,15 +46,26 @@ ALL_FILES = MAIN_INJECT_FILES + [
     {"path": "NOTES.md", "label": "角色笔记"},
 ]
 
+def is_soul_empty() -> bool:
+    """判断 SOUL.md 是否为空（只有骨架标题没有实质内容）。"""
+    soul_path = WORKSPACE_DIR / "SOUL.md"
+    if not soul_path.exists():
+        return True
+    content = soul_path.read_text(encoding="utf-8")
+    for header in ["# Soul", "## 身份", "## 性格", "## 说话风格", "## 回复规则", "## 成长变化"]:
+        content = content.replace(header, "")
+    return not content.strip()
+
+
 # 每个记忆文件注入的最大字符数
 MAX_INJECT_CHARS = int(os.getenv("MAX_INJECT_CHARS", "10000"))
 
 # 对话历史保留轮数
-MAX_HISTORY_TURNS = int(os.getenv("MAX_HISTORY_TURNS", "50"))
+MAX_HISTORY_TURNS = int(os.getenv("MAX_HISTORY_TURNS", "13"))
 
 # 系统文件初始模板
 FILE_TEMPLATES = {
-    "SOUL.md": "# Soul\n\n## 身份\n\n## 性格\n\n## 说话风格\n\n## 成长变化\n\n",
+    "SOUL.md": "# Soul\n\n## 身份\n\n## 性格\n\n## 说话风格\n\n## 回复规则\n\n## 成长变化\n\n",
     "MEMORY.md": "# Memory\n\n## 钉住的（不可压缩）\n\n\n## 近期\n\n",
     "USER.md": "# User\n\n## 身份\n\n## 性格\n\n## 喜恶\n\n## 与角色的关系\n\n",
     "NOTES.md": "",

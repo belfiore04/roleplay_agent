@@ -32,8 +32,12 @@ def build_system_prompt() -> str:
     """每轮对话前重新读取记忆文件，构建 system prompt。"""
 
     # 用 XML tag 分隔注入各记忆文件
+    soul_empty = config.is_soul_empty()
     context_sections = []
     for mf in MAIN_INJECT_FILES:
+        # CHARACTER.md 提取完成后不再注入
+        if mf["path"].lower() == "character.md" and not soul_empty:
+            continue
         tag = mf["path"].replace(".md", "").lower()
         content = _read_workspace_file(mf["path"]) or "（暂无内容）"
         context_sections.append(f"<{tag}>\n{content}\n</{tag}>")
@@ -45,7 +49,11 @@ def build_system_prompt() -> str:
 时区: Asia/Shanghai
 </environment>
 
-{context_block}"""
+{context_block}
+
+<instructions>
+主动推进对话：根据你的性格和记忆，自然地回应对方、发起新话题或转移话题方向，让对话保持活跃。
+</instructions>"""
 
 
 @observe(as_type="generation", name="主 Agent LLM 调用")
@@ -95,7 +103,9 @@ def proactive_chat() -> str:
     else:
         system_prompt += '\n\n<task>\n用户回来了。根据你对他的了解和最近的记忆，主动说一句话。可以是打招呼、接上次的话题、或者根据当前时间/情境自然地开口。不要生硬地"总结上次内容"，要像真的记得一样自然地说。\n</task>'
 
-    reply = _call_llm(system_prompt, [])
+    # 火山引擎等 API 要求至少有一条 user 消息，用触发消息代替空列表
+    trigger = [{"role": "user", "content": "（你主动开口说话）"}]
+    reply = _call_llm(system_prompt, trigger)
 
     get_langfuse().update_current_trace(
         input="[主动说话]",
